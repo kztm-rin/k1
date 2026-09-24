@@ -98,6 +98,8 @@ function archiveCompletedTasks() {
 function findCompletedRows_(ss) {
   var result = [];
   ss.getSheets().forEach(function (sheet) {
+    // グラフだけのシート（OBJECT）やデータコネクタのシートは行を扱えないので飛ばす
+    if (sheet.getType() !== SpreadsheetApp.SheetType.GRID) return;
     if (EXCLUDED_SHEETS.indexOf(sheet.getName()) !== -1) return;
 
     var headerRow = findHeaderRow_(sheet);
