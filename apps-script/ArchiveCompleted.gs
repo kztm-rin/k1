@@ -23,17 +23,6 @@ var DONE = '完了';
 // 見出し行を探す範囲（上から何行目まで）
 var HEADER_SEARCH_ROWS = 5;
 
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('タスク表')
-    .addItem('完了タスクを完了タブへ移す', 'archiveCompletedTasksFromMenu')
-    .addItem('移す対象を確認する（移動しない）', 'previewCompletedTasks')
-    .addSeparator()
-    .addItem('毎週月曜の自動アーカイブを設定', 'installWeeklyTrigger')
-    .addItem('自動アーカイブを解除', 'removeWeeklyTrigger')
-    .addToUi();
-}
-
 function archiveCompletedTasksFromMenu() {
   var ui = SpreadsheetApp.getUi();
   var targets = findCompletedRows_(SpreadsheetApp.getActiveSpreadsheet());
