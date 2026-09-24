@@ -1,8 +1,10 @@
 /**
  * TASK表：完了タスクのアーカイブ
  *
- * 各プロジェクトタブから「ステータス」または「状態」が「完了」の行を
- * 完了タブへ移し、元のタブからは削除する（記載ルール 7．完了したタスクの扱い）。
+ * 各プロジェクトタブから「ステータス」が「完了」の行を完了タブへ移し、
+ * 元のタブからは削除する（記載ルール 7．完了したタスクの扱い）。
+ * 「状態」だけが「完了」の行は移さない。
+ * 完了タブの「元タブ」列には移動元のタブ名を、そのタブへのリンク付きで入れる。
  *
  * 対象になるタブ：A列の見出しが「項目」、続く列が「Task」…「ステータス」の
  * 12列構成になっているタブ。全体タブ（カテゴリ列あり）や記載ルールタブ、
@@ -47,7 +49,7 @@ function archiveCompletedTasksFromMenu() {
   if (answer !== ui.Button.OK) return;
 
   var moved = archiveCompletedTasks();
-  ui.alert(moved + ' 行を「' + ARCHIVE_SHEET_NAME + '」タブへ移しました。');
+  ui.alert(summarize_(targets) + '\n\n計 ' + moved + ' 行を「' + ARCHIVE_SHEET_NAME + '」タブへ移しました。');
 }
 
 function previewCompletedTasks() {
@@ -106,12 +108,11 @@ function findCompletedRows_(ss) {
 
     var width = TASK_HEADERS.length;
     var values = sheet.getRange(headerRow + 1, 1, lastRow - headerRow, width).getDisplayValues();
-    var stateCol = TASK_HEADERS.indexOf('状態');
     var statusCol = TASK_HEADERS.indexOf('ステータス');
 
     var rows = [];
     values.forEach(function (v, i) {
-      if (String(v[statusCol]).trim() === DONE || String(v[stateCol]).trim() === DONE) {
+      if (String(v[statusCol]).trim() === DONE) {
         rows.push(headerRow + 1 + i);
       }
     });
@@ -151,6 +152,10 @@ function getOrCreateArchiveSheet_(ss) {
 function copyRowToArchive_(source, row, width, archive, archivedAt) {
   var destRow = archive.getLastRow() + 1;
   archive.getRange(destRow, 1, 1, 2).setValues([[source.getName(), archivedAt]]);
+  archive.getRange(destRow, 1).setRichTextValue(SpreadsheetApp.newRichTextValue()
+    .setText(source.getName())
+    .setLinkUrl('#gid=' + source.getSheetId())
+    .build());
   archive.getRange(destRow, 2).setNumberFormat('yy/m/d');
 
   var src = source.getRange(row, 1, 1, width);
