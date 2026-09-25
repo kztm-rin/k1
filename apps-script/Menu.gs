@@ -10,14 +10,16 @@ function onOpen() {
     .addSeparator()
     .addItem('統合タブを作り直す', 'rebuildIntegrationFromMenu')
     .addItem('ダッシュボードを作り直す', 'setupDashboard')
+    .addItem('各タブに期日の色を付ける', 'applyDeadlineColorsFromMenu')
     .addSeparator()
     .addItem('自動処理を設定（タブ追加時の統合更新・毎週月曜のアーカイブ）', 'installTriggers')
     .addItem('自動処理を解除', 'removeTriggers')
     .addToUi();
 
-  // タブが増減・改名されていたら統合タブの数式を合わせる
+  // タブが増減・改名されていたら統合タブの数式を合わせ、新しいタブにも期日の色を付ける
   try {
     refreshIntegration_(false);
+    applyDeadlineColors_(true);
   } catch (e) {
     console.warn(e);
   }
@@ -42,4 +44,5 @@ function removeTriggers() {
 function handleSpreadsheetChange(e) {
   if (e && ['INSERT_GRID', 'REMOVE_GRID', 'OTHER'].indexOf(e.changeType) === -1) return;
   refreshIntegration_(false);
+  if (e && e.changeType === 'INSERT_GRID') applyDeadlineColors_(true);
 }
