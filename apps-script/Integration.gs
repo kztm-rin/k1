@@ -51,18 +51,32 @@ function refreshIntegration_(force) {
   var lock = LockService.getDocumentLock();
   lock.waitLock(30 * 1000);
   try {
-    sheet.getRange(1, 1, 1, INTEGRATED_HEADERS.length).setValues([INTEGRATED_HEADERS]);
+    // 統合タブは「表」になっていて、複数列をまとめて操作するとエラーになるので1列ずつ扱う
+    var header = sheet.getRange(1, 1, 1, INTEGRATED_HEADERS.length).getDisplayValues()[0];
     var lastRow = sheet.getLastRow();
-    if (lastRow >= 2) sheet.getRange(2, 1, lastRow - 1, INTEGRATED_HEADERS.length).clearContent();
+    INTEGRATED_HEADERS.forEach(function (h, i) {
+      if (header[i] !== h) sheet.getRange(1, i + 1).setValue(h);
+      if (lastRow >= 2) sheet.getRange(2, i + 1, lastRow - 1, 1).clearContent();
+    });
     anchor.setFormula(formula);
 
     var rows = sheet.getMaxRows() - 1;
-    sheet.getRange(2, 6, rows, 2).setNumberFormat(DATE_FORMAT);   // 開始・期日
-    sheet.getRange(2, 8, rows, 1).setNumberFormat('0');           // 残日数
+    setColumnFormat_(sheet.getRange(2, 6, rows, 1), DATE_FORMAT);   // 開始
+    setColumnFormat_(sheet.getRange(2, 7, rows, 1), DATE_FORMAT);   // 期日
+    setColumnFormat_(sheet.getRange(2, 8, rows, 1), '0');           // 残日数
   } finally {
     lock.releaseLock();
   }
   return sources;
+}
+
+/** 表の列の種類で書式が決まっている列は変更できないので、失敗しても続ける */
+function setColumnFormat_(range, format) {
+  try {
+    range.setNumberFormat(format);
+  } catch (e) {
+    console.warn(e);
+  }
 }
 
 function findSourceSheets_(ss) {
