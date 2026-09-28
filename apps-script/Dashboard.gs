@@ -2,7 +2,8 @@
  * ダッシュボードタブ：期日が近い未完了タスクの一覧
  *
  * TASK表 統合タブを元に、数式だけで動く（開くたび・編集のたびに最新になる）。
- * - E2 の「表示する日数」以内に期日が来るタスクと、期日を過ぎたタスクを期日順に出す
+ * - E2 の「表示する日数」以内に期日が来るタスクと、期日を過ぎたタスクを出す
+ * - 担当ごとに見出し行（■ 担当名（件数））でまとめ、その中は期日順に並べる
  * - H2 で担当を選ぶと、その人のタスクだけに絞れる（空欄なら全員）
  * - ステータスか状態が「完了」の行は出さない
  * - 期限切れ・今日・3日以内・7日以内で行に色を付ける
@@ -77,7 +78,14 @@ function setupDashboard() {
     'hits,FILTER(tasks,ISNUMBER(due),due<=TODAY()+$E$2,' +
     'CHOOSECOLS(tasks,13)<>"完了",CHOOSECOLS(tasks,9)<>"完了",' +
     '($H$2="")+(CHOOSECOLS(tasks,5)=$H$2)),' +
-    'SORT(HSTACK(CHOOSECOLS(hits,7),CHOOSECOLS(hits,7)-TODAY(),CHOOSECOLS(hits,1,2,3,5,9,10,4)),1,TRUE,4,TRUE)' +
+    // 担当ごとにまとめ、各担当の見出し行（■ 担当名（件数））の下に期日順で並べる
+    'owner,IF(CHOOSECOLS(hits,5)="","（担当なし）",CHOOSECOLS(hits,5)),' +
+    'items,HSTACK(CHOOSECOLS(hits,7),CHOOSECOLS(hits,7)-TODAY(),CHOOSECOLS(hits,1,2,3),owner,CHOOSECOLS(hits,9,10,4)),' +
+    'people,SORT(UNIQUE(owner)),' +
+    'grouped,REDUCE(IF(SEQUENCE(1,9),""),people,LAMBDA(acc,p,LET(' +
+    'mine,SORT(FILTER(items,CHOOSECOLS(items,6)=p),1,TRUE,4,TRUE),' +
+    'VSTACK(acc,HSTACK("■ "&p&"（"&ROWS(mine)&"件）",IF(SEQUENCE(1,8),"")),mine)))),' +
+    'DROP(grouped,1)' +
     '),"該当するタスクはありません"))');
 
   var rows = sheet.getMaxRows() - L + 1;
@@ -92,7 +100,11 @@ function setupDashboard() {
       .whenFormulaSatisfied('=AND(ISNUMBER($B' + L + '),' + expr + ')')
       .setBackground(color).setRanges([list]).build();
   };
+  var groupRow = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=LEFT($A' + L + ',1)="■"')
+    .setBackground('#cfe2f3').setBold(true).setRanges([list]).build();
   sheet.setConditionalFormatRules([
+    groupRow,
     cond('$B' + L + '<0', DASHBOARD_COLORS.overdue),
     cond('$B' + L + '=0', DASHBOARD_COLORS.today),
     cond('$B' + L + '<=3', DASHBOARD_COLORS.within3),
@@ -100,7 +112,7 @@ function setupDashboard() {
   ]);
 
   sheet.setFrozenRows(L - 1);
-  [110, 80, 110, 110, 320, 70, 90, 90, 360].forEach(function (w, i) {
+  [150, 80, 110, 110, 320, 70, 90, 90, 360].forEach(function (w, i) {
     sheet.setColumnWidth(i + 1, w);
   });
   sheet.activate();
