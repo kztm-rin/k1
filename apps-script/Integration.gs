@@ -45,6 +45,8 @@ function refreshIntegration_(force) {
 
   var sources = findSourceSheets_(ss);
   var formula = buildIntegrationFormula_(sources);
+  updateDashboardFormula_(ss, sources);
+
   var anchor = sheet.getRange('A2');
   if (!force && normalizeFormula_(anchor.getFormula()) === normalizeFormula_(formula)) return sources;
 
@@ -101,15 +103,23 @@ function findSourceSheets_(ss) {
   return sources;
 }
 
+/**
+ * 各タブを縦につないだ配列の式。列は 1カテゴリ 2〜13 各タブのA〜L列、
+ * withLink のときは 14 にその行へのリンク（#gid=…&range=A行）を足す。
+ */
+function buildSourceStack_(sources, withLink) {
+  return 'VSTACK(' + sources.map(function (s) {
+    var ref = "'" + s.name.replace(/'/g, "''") + "'!A" + s.firstDataRow + ':L';
+    var link = withLink ? ',"#gid=' + s.sheet.getSheetId() + '&range=A"&ROW(tab)' : '';
+    return 'LET(tab,' + ref + ',HSTACK(IF(SEQUENCE(ROWS(tab)),"' + s.category.replace(/"/g, '""') + '"),tab' + link + '))';
+  }).join(',') + ')';
+}
+
 function buildIntegrationFormula_(sources) {
   if (sources.length === 0) return '=""';
-  var parts = sources.map(function (s) {
-    var ref = "'" + s.name.replace(/'/g, "''") + "'!A" + s.firstDataRow + ':L';
-    return 'LET(tab,' + ref + ',HSTACK(IF(SEQUENCE(ROWS(tab)),"' + s.category.replace(/"/g, '""') + '"),tab))';
-  });
   // 列：1カテゴリ 2項目 3Task 4状況詳細 5担当 6開始 7期日 8残日数 9状態 10重要度 11URL1 12URL2 13ステータス
   return '=ARRAYFORMULA(IFERROR(LET(' +
-    'allrows,VSTACK(' + parts.join(',') + '),' +
+    'allrows,' + buildSourceStack_(sources, false) + ',' +
     'dated,FILTER(allrows,ISNUMBER(CHOOSECOLS(allrows,7))),' +
     'sorted,SORT(dated,7,TRUE),' +
     'due,CHOOSECOLS(sorted,7),' +
