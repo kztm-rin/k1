@@ -10,7 +10,7 @@ function onOpen() {
     .addSeparator()
     .addItem('統合タブを作り直す', 'rebuildIntegrationFromMenu')
     .addItem('ダッシュボードを作り直す', 'setupDashboard')
-    .addItem('各タブに期日の色を付ける', 'applyDeadlineColorsFromMenu')
+    .addItem('各タブに色を付ける（完了・期日）', 'applyDeadlineColorsFromMenu')
     .addSeparator()
     .addItem('自動処理を設定（タブ追加時の統合更新・毎週月曜のアーカイブ）', 'installTriggers')
     .addItem('自動処理を解除', 'removeTriggers')

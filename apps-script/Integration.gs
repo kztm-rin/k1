@@ -20,7 +20,7 @@ var INTEGRATION_EXCLUDED = ['TASK表 統合', 'TASK表 Archive'];
 var CATEGORY_ALIASES = {
   '代々木駅前': '代々木',
   '新規案件': '新規',
-  '運営（既存媒体運営制作管理）': '運営'
+  '運営（既存媒体運営/制作/管理）': '運営'
 };
 
 var INTEGRATED_HEADERS = ['カテゴリ'].concat(TASK_HEADERS);

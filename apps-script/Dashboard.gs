@@ -118,6 +118,9 @@ function setupDashboard() {
 function updateDashboardFormula_(ss, sources) {
   var sheet = ss.getSheetByName(DASHBOARD_SHEET_NAME);
   if (!sheet) return;
+  // 古いレイアウトのまま数式だけ差し替えると表示が壊れるので、作り直し済みのときだけ更新する
+  var lastHeader = sheet.getRange(DASHBOARD_LIST_ROW - 1, DASHBOARD_HEADERS.length).getValue();
+  if (lastHeader !== DASHBOARD_HEADERS[DASHBOARD_HEADERS.length - 1]) return;
   var anchor = sheet.getRange(DASHBOARD_LIST_ROW, 2);
   var formula = buildDashboardFormula_(sources);
   if (normalizeFormula_(anchor.getFormula()) !== normalizeFormula_(formula)) anchor.setFormula(formula);
