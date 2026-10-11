@@ -4,10 +4,11 @@
  * 「TASK表」で始まるプロジェクトタブを全部つないだ数式を、統合タブの A2 に1つだけ置く。
  * - 行の追加・削除・編集は数式がそのまま拾うので、手で範囲を直す必要はない
  * - カテゴリ列はタブ名から自動で入る（「TASK表 」を除いた名前。CATEGORY_ALIASES で言い換え可）
- * - 期日の入っている行だけを、期日の早い順に並べる（記載ルール 1．期日）
+ * - 期日の入っている行だけを、タブの並び順（左から）にまとめ、その中を期日の早い順に並べる
+ *   （統合タイムラインもこの順に並ぶ）
  * - 残日数は 期日 − 今日 で計算する
  * - 開始が空の行は、統合タイムラインに載るよう 開始 = 期日 として出す
- * タブの追加・削除・名前変更のときだけ、スクリプトが数式を書き直す。
+ * タブの追加・削除・名前変更・並べ替えのときだけ、スクリプトが数式を書き直す。
  */
 
 var INTEGRATED_SHEET_NAME = 'TASK表 統合';
@@ -105,13 +106,16 @@ function findSourceSheets_(ss) {
 
 /**
  * 各タブを縦につないだ配列の式。列は 1カテゴリ 2〜13 各タブのA〜L列、
- * withLink のときは 14 にその行へのリンク（#gid=…&range=A行）を足す。
+ * withLink のときは 14 にその行へのリンク（#gid=…&range=A行）を、
+ * withOrder のときは 14 にタブの並び順（1, 2, …）を足す。
  */
-function buildSourceStack_(sources, withLink) {
-  return 'VSTACK(' + sources.map(function (s) {
+function buildSourceStack_(sources, withLink, withOrder) {
+  return 'VSTACK(' + sources.map(function (s, i) {
     var ref = "'" + s.name.replace(/'/g, "''") + "'!A" + s.firstDataRow + ':L';
-    var link = withLink ? ',"#gid=' + s.sheet.getSheetId() + '&range=A"&ROW(tab)' : '';
-    return 'LET(tab,' + ref + ',HSTACK(IF(SEQUENCE(ROWS(tab)),"' + s.category.replace(/"/g, '""') + '"),tab' + link + '))';
+    var extra = '';
+    if (withLink) extra += ',"#gid=' + s.sheet.getSheetId() + '&range=A"&ROW(tab)';
+    if (withOrder) extra += ',IF(SEQUENCE(ROWS(tab)),' + (i + 1) + ')';
+    return 'LET(tab,' + ref + ',HSTACK(IF(SEQUENCE(ROWS(tab)),"' + s.category.replace(/"/g, '""') + '"),tab' + extra + '))';
   }).join(',') + ')';
 }
 
@@ -119,9 +123,10 @@ function buildIntegrationFormula_(sources) {
   if (sources.length === 0) return '=""';
   // 列：1カテゴリ 2項目 3Task 4状況詳細 5担当 6開始 7期日 8残日数 9状態 10重要度 11URL1 12URL2 13ステータス
   return '=ARRAYFORMULA(IFERROR(LET(' +
-    'allrows,' + buildSourceStack_(sources, false) + ',' +
+    'allrows,' + buildSourceStack_(sources, false, true) + ',' +
     'dated,FILTER(allrows,ISNUMBER(CHOOSECOLS(allrows,7))),' +
-    'sorted,SORT(dated,7,TRUE),' +
+    // 14列目（タブの並び順）→ 期日 の順に並べる。14列目は出力しない
+    'sorted,SORT(dated,14,TRUE,7,TRUE),' +
     'due,CHOOSECOLS(sorted,7),' +
     'startdate,CHOOSECOLS(sorted,6),' +
     'HSTACK(CHOOSECOLS(sorted,1,2,3,4,5),IF(startdate="",due,startdate),due,due-TODAY(),CHOOSECOLS(sorted,9,10,11,12,13))' +

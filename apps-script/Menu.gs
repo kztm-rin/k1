@@ -40,7 +40,7 @@ function removeTriggers() {
   removeWeeklyTrigger();
 }
 
-/** タブの追加・削除・名前変更（changeType は INSERT_GRID / REMOVE_GRID / OTHER）で統合タブを合わせる */
+/** タブの追加・削除・名前変更・並べ替え（changeType は INSERT_GRID / REMOVE_GRID / OTHER）で統合タブを合わせる */
 function handleSpreadsheetChange(e) {
   if (e && ['INSERT_GRID', 'REMOVE_GRID', 'OTHER'].indexOf(e.changeType) === -1) return;
   refreshIntegration_(false);
