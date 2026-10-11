@@ -4,7 +4,8 @@
  * 各 TASK表 タブを直接つないだ数式で動く（開くたび・編集のたびに最新になる）。
  * - E2 の「表示する日数」以内に期日が来るタスクと、期日を過ぎたタスクを出す
  * - 担当ごとに見出し行（■ 担当名（件数））でまとめ、その中は期日順に並べる
- * - H2 で担当を選ぶと、その人のタスクだけに絞れる（空欄なら全員）
+ * - H2 で担当を選ぶと、その人のタスクだけに絞れる。「全て」は担当なしを含む全員、
+ *   「（担当なし）」は担当が空欄のタスクだけ（選択肢は L 列に自動で作る。L 列は非表示）
  * - ステータスか状態が「完了」の行は出さない
  * - 期限切れ・今日・3日以内・7日以内で行に色を付ける
  * - A列の「開く」で、元のタブのその行へ飛ぶ
@@ -13,6 +14,9 @@
 var DASHBOARD_SHEET_NAME = 'ダッシュボード';
 var DASHBOARD_DEFAULT_DAYS = 14;
 var DASHBOARD_LIST_ROW = 8;   // 一覧の1行目（見出しはその1行上）
+var DASHBOARD_ALL = '全て';
+var DASHBOARD_NO_OWNER = '（担当なし）';
+var DASHBOARD_OPTIONS_COL = 12;   // L列：担当の選択肢（非表示）
 
 var DASHBOARD_COLORS = {
   overdue: '#f4cccc',
@@ -29,18 +33,21 @@ function setupDashboard() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(DASHBOARD_SHEET_NAME);
   var days = DASHBOARD_DEFAULT_DAYS;
-  var person = '';
+  var person = DASHBOARD_ALL;
   if (sheet) {
     // 作り直しても、設定した日数と担当は引き継ぐ
     days = Number(sheet.getRange('E2').getValue()) || DASHBOARD_DEFAULT_DAYS;
-    person = sheet.getRange('H2').getValue();
+    person = sheet.getRange('H2').getValue() || DASHBOARD_ALL;
     sheet.clear();
     sheet.clearConditionalFormatRules();
     sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
-    sheet.showColumns(1, sheet.getMaxColumns());
   } else {
     sheet = ss.insertSheet(DASHBOARD_SHEET_NAME, 0);
   }
+  if (sheet.getMaxColumns() < DASHBOARD_OPTIONS_COL) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), DASHBOARD_OPTIONS_COL - sheet.getMaxColumns());
+  }
+  sheet.showColumns(1, sheet.getMaxColumns());
 
   var L = DASHBOARD_LIST_ROW;
 
@@ -51,9 +58,15 @@ function setupDashboard() {
   sheet.getRange('A2:H2').setFontColor('#666666');
   sheet.getRange('E2').setBackground('#fff8e1').setFontColor('#000000')
     .setDataValidation(SpreadsheetApp.newDataValidation().requireNumberBetween(0, 365).build());
+  // 担当の選択肢：全て・（担当なし）・統合タブに出てくる担当者（名前順）
+  var owners = "'" + INTEGRATED_SHEET_NAME + "'!E2:E";
+  sheet.getRange(1, DASHBOARD_OPTIONS_COL).setFormula(
+    '=VSTACK("' + DASHBOARD_ALL + '","' + DASHBOARD_NO_OWNER + '",' +
+    'IFERROR(SORT(UNIQUE(FILTER(' + owners + ',' + owners + '<>""))),""))');
   sheet.getRange('H2').setBackground('#fff8e1').setFontColor('#000000')
     .setDataValidation(SpreadsheetApp.newDataValidation()
-      .requireValueInRange(ss.getRange("'" + INTEGRATED_SHEET_NAME + "'!E2:E"), true).setAllowInvalid(true).build());
+      .requireValueInRange(sheet.getRange(1, DASHBOARD_OPTIONS_COL, sheet.getMaxRows(), 1), true)
+      .setAllowInvalid(true).build());
 
   // 4〜5行目：件数
   var c = 'C' + L + ':C';
@@ -107,7 +120,8 @@ function setupDashboard() {
   DASHBOARD_WIDTHS.forEach(function (w, i) {
     sheet.setColumnWidth(i + 1, w);
   });
-  sheet.hideColumns(width);   // リンク先の列
+  sheet.hideColumns(width);                   // リンク先の列
+  sheet.hideColumns(DASHBOARD_OPTIONS_COL);   // 担当の選択肢の列
   sheet.activate();
 }
 
@@ -129,19 +143,22 @@ function updateDashboardFormula_(ss, sources) {
 function buildDashboardFormula_(sources) {
   if (sources.length === 0) return '="該当するタスクはありません"';
   // 元の列：1カテゴリ 2項目 3Task 4状況詳細 5担当 6開始 7期日 8残日数 9状態 10重要度 11URL1 12URL2 13ステータス 14リンク先
+  // （hits ではさらに 15 に担当名。空欄は（担当なし））
   // 出力：期日 残日数 カテゴリ 項目 Task 担当 状態 重要度 状況詳細 リンク先
   return '=ARRAYFORMULA(IFERROR(LET(' +
     'tasks,' + buildSourceStack_(sources, true) + ',' +
     'due,CHOOSECOLS(tasks,7),' +
-    'hits,FILTER(tasks,ISNUMBER(due),due<=TODAY()+$E$2,' +
+    // 担当が空欄の行は（担当なし）として扱う。H2 が空欄か「全て」なら全員、それ以外はその担当だけ
+    'who,IF(CHOOSECOLS(tasks,5)="","' + DASHBOARD_NO_OWNER + '",CHOOSECOLS(tasks,5)),' +
+    'hits,FILTER(HSTACK(tasks,who),ISNUMBER(due),due<=TODAY()+$E$2,' +
     'CHOOSECOLS(tasks,13)<>"完了",CHOOSECOLS(tasks,9)<>"完了",' +
-    '($H$2="")+(CHOOSECOLS(tasks,5)=$H$2)),' +
+    '($H$2="")+($H$2="' + DASHBOARD_ALL + '")+(who=$H$2)),' +
     // 担当ごとにまとめ、各担当の見出し行（■ 担当名（件数））の下に期日順で並べる
-    'owner,IF(CHOOSECOLS(hits,5)="","（担当なし）",CHOOSECOLS(hits,5)),' +
+    'owner,CHOOSECOLS(hits,15),' +
     'items,HSTACK(CHOOSECOLS(hits,7),CHOOSECOLS(hits,7)-TODAY(),CHOOSECOLS(hits,1,2,3),owner,CHOOSECOLS(hits,9,10,4,14)),' +
     // 担当は名前順、（担当なし）は最後（担当が1人でも動くよう、並べ替え用の列を横に付けてから並べる）
     'owners,UNIQUE(owner),' +
-    'people,CHOOSECOLS(SORT(HSTACK(owners="（担当なし）",owners),1,TRUE,2,TRUE),2),' +
+    'people,CHOOSECOLS(SORT(HSTACK(owners="' + DASHBOARD_NO_OWNER + '",owners),1,TRUE,2,TRUE),2),' +
     'grouped,REDUCE(IF(SEQUENCE(1,10),""),people,LAMBDA(acc,p,LET(' +
     'mine,SORT(FILTER(items,CHOOSECOLS(items,6)=p),1,TRUE,4,TRUE),' +
     'VSTACK(acc,HSTACK("■ "&p&"（"&ROWS(mine)&"件）",IF(SEQUENCE(1,9),"")),mine)))),' +
